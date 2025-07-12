@@ -9,7 +9,7 @@ class CryptoTradingSystem {
             dexscreener: "https://api.dexscreener.com/latest/",
             coingecko: "https://api.coingecko.com/api/v3/",
             jupiter: "https://lite-api.jup.ag/",
-            birdeye: "https://public-api.birdeye.so/defi/v3/",
+            birdeye: "https://public-api.birdeye.so/defi/",
             openai: "https://api.openai.com/v1/"
         };
         
