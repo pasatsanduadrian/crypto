@@ -8,7 +8,7 @@ class CryptoTradingSystem {
             dexscreener: "https://api.dexscreener.com/latest/",
             coingecko: "https://api.coingecko.com/api/v3/",
             jupiter: "https://lite-api.jup.ag/",
-            birdeye: "https://public-api.birdeye.so/",
+            birdeye: "https://public-api.birdeye.so/defi/",
             openai: "https://api.openai.com/v1/"
         };
         
@@ -200,7 +200,7 @@ class CryptoTradingSystem {
     
     async testBirdeyeConnection(apiKey) {
         try {
-            const response = await fetch(`${this.apiEndpoints.birdeye}public/tokenlist?sort_by=v24hUSD&sort_type=desc&offset=0&limit=50`, {
+            const response = await fetch(`${this.apiEndpoints.birdeye}tokenlist?sort_by=v24hUSD&sort_type=desc&offset=0&limit=50`, {
                 headers: {
                     'X-API-KEY': apiKey
                 }
@@ -340,7 +340,7 @@ class CryptoTradingSystem {
         if (!this.apiKeys.birdeye) return [];
         
         try {
-            const response = await fetch(`${this.apiEndpoints.birdeye}public/tokenlist?sort_by=v24hUSD&sort_type=desc&offset=0&limit=50`, {
+            const response = await fetch(`${this.apiEndpoints.birdeye}tokenlist?sort_by=v24hUSD&sort_type=desc&offset=0&limit=50`, {
                 headers: {
                     'X-API-KEY': this.apiKeys.birdeye
                 }
@@ -534,7 +534,7 @@ Consider factors like volume/mcap ratio, price momentum, and liquidity. Respond 
         
         if (this.apiKeys.birdeye) {
             try {
-                const response = await fetch(`${this.apiEndpoints.birdeye}public/token_overview?address=${tokenAddress}`, {
+                const response = await fetch(`${this.apiEndpoints.birdeye}token_overview?address=${tokenAddress}`, {
                     headers: { 'X-API-KEY': this.apiKeys.birdeye }
                 });
                 if (response.ok) {
