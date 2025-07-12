@@ -4,7 +4,7 @@ class CryptoTradingSystem {
         this.apiKeys = {};
         this.apiEndpoints = {
             helius: "https://mainnet.helius-rpc.com/",
-            helRehuisEnhanced: "https://api.helius.xyz/v0/",
+            heliusEnhanced: "https://api.helius.xyz/v0/",
             moralis: "https://deep-index.moralis.io/api/v2/",
             dexscreener: "https://api.dexscreener.com/latest/",
             coingecko: "https://api.coingecko.com/api/v3/",
@@ -371,43 +371,68 @@ class CryptoTradingSystem {
     
     async scanMarket() {
         try {
-            this.logMessage('Scanare piață...', 'info');
-            // Scan DexScreener for trending tokens
+            this.logMessage('=== ÎNCEPE SCANAREA PIEȚEI ===', 'info');
+
+            this.logMessage('Scanez DexScreener...', 'info');
             const dexData = await this.scanDexScreener();
+            this.logMessage(`DexScreener: ${dexData.length} tokens brute`, 'info');
 
-            // Scan Birdeye for new tokens
+            this.logMessage('Scanez Birdeye...', 'info');
             const birdeyeData = await this.scanBirdeye();
+            this.logMessage(`Birdeye: ${birdeyeData.length} tokens brute`, 'info');
 
-            // Scan Helius for Solana tokens
+            this.logMessage('Scanez Helius...', 'info');
             const heliusData = await this.scanHelius();
+            this.logMessage(`Helius: ${heliusData.length} tokens brute`, 'info');
 
-            // Combine and analyze data
             const allTokens = [...dexData, ...birdeyeData, ...heliusData];
+            this.logMessage(`Total tokens brute: ${allTokens.length}`, 'info');
+            if (allTokens.length > 0) {
+                this.logMessage(`Sample tokens: ${JSON.stringify(allTokens.slice(0, 3), null, 2)}`, 'info');
+            }
+
             const filteredTokens = this.filterTokens(allTokens);
-            
-            // Analyze with LLM if available
+            this.logMessage(`Tokens după filtre: ${filteredTokens.length}`, 'info');
+
             for (const token of filteredTokens) {
                 if (this.apiKeys.openai) {
+                    this.logMessage(`Analizez ${token.symbol} cu LLM...`, 'info');
                     token.llmScore = await this.analyzeLLM(token);
+                    this.logMessage(`LLM Score pentru ${token.symbol}: ${token.llmScore}`, 'info');
                 }
             }
-            
-            // Update UI
+
             this.updateScannerResults(filteredTokens);
-            
+            this.logMessage('=== SCANARE COMPLETĂ ===', 'success');
+
         } catch (error) {
-            console.error('Error scanning market:', error);
-            this.showToast(`Eroare la scanare: ${error.message}`, 'error');
+            this.logMessage(`Eroare la scanare: ${error.message}`, 'error');
+            console.error('Scanare error:', error);
         }
     }
     
     async scanDexScreener() {
         try {
-            const url = `${this.apiEndpoints.dexscreener}dex/tokens/trending`;
-            const data = await this.fetchJson(url);
-            const pairs = data.schemaVersion ? data.pairs || [] : [];
-            this.logMessage(`DexScreener ${pairs.length} tokeni`, 'info');
-            return pairs;
+            const endpoints = [
+                `${this.apiEndpoints.dexscreener}dex/tokens/trending`,
+                `${this.apiEndpoints.dexscreener}dex/search?q=solana`,
+                `${this.apiEndpoints.dexscreener}dex/tokens/new`
+            ];
+
+            for (const url of endpoints) {
+                try {
+                    const data = await this.fetchJson(url);
+                    if (data && data.pairs && data.pairs.length > 0) {
+                        this.logMessage(`DexScreener endpoint ${url}: ${data.pairs.length} pairs`, 'info');
+                        return data.pairs;
+                    }
+                } catch (err) {
+                    this.logMessage(`DexScreener endpoint ${url} failed: ${err.message}`, 'warning');
+                }
+            }
+
+            this.logMessage('All DexScreener endpoints failed', 'error');
+            return [];
         } catch (error) {
             this.logMessage(`DexScreener error: ${error.message}`, 'error');
             return [];
@@ -435,42 +460,61 @@ class CryptoTradingSystem {
         if (!this.apiKeys.helius) return [];
 
         try {
-            const url = `${this.apiEndpoints.helius}?api-key=${this.apiKeys.helius}`;
+            const rpcUrl = `${this.apiEndpoints.helius}?api-key=${this.apiKeys.helius}`;
 
-            const response = await fetch(url, {
+            // Get recent transactions for the SPL token program
+            const sigResp = await fetch(rpcUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     jsonrpc: "2.0",
                     id: 1,
-                    method: "getTokenAccountsByOwner",
-                    params: [
-                        "86xCnPeV69n6t3DnyGvkKobf9FdN2H9oiVDdaMpo2MMY",
-                        { "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
-                        { "encoding": "jsonParsed" }
-                    ]
+                    method: "getSignaturesForAddress",
+                    params: ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", { limit: 20 }]
                 })
             });
 
-            if (!response.ok) {
-                throw new Error(`Helius scan error: ${response.status}`);
+            const sigData = await sigResp.json();
+            if (!sigResp.ok || sigData.error) {
+                throw new Error(sigData.error ? sigData.error.message : sigResp.status);
             }
 
-            const data = await response.json();
+            const signatures = sigData.result.map(s => s.signature);
+            const tokens = [];
 
-            if (data.error) {
-                throw new Error(`Helius API error: ${data.error.message}`);
+            for (const signature of signatures) {
+                const txResp = await fetch(rpcUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: "2.0",
+                        id: 1,
+                        method: "getTransaction",
+                        params: [signature, { encoding: "json", maxSupportedTransactionVersion: 0 }]
+                    })
+                });
+                const txData = await txResp.json();
+                if (txResp.ok && !txData.error) {
+                    const balances = txData.result?.meta?.postTokenBalances || [];
+                    balances.forEach(b => {
+                        if (b.owner && b.mint) {
+                            tokens.push({ address: b.mint, source: 'helius' });
+                        }
+                    });
+                }
             }
 
-            const tokenAccounts = data.result?.value || [];
-            this.logMessage(`Helius: ${tokenAccounts.length} token accounts`, 'info');
+            const unique = [];
+            const seen = new Set();
+            for (const t of tokens) {
+                if (!seen.has(t.address)) {
+                    seen.add(t.address);
+                    unique.push(t);
+                }
+            }
 
-            return tokenAccounts.map(account => ({
-                address: account.account.data.parsed.info.mint,
-                balance: account.account.data.parsed.info.tokenAmount.uiAmount,
-                symbol: 'UNKNOWN',
-                source: 'helius'
-            }));
+            this.logMessage(`Helius: ${unique.length} possible tokens found`, 'info');
+            return unique;
 
         } catch (error) {
             this.logMessage(`Helius scan error: ${error.message}`, 'error');
@@ -479,20 +523,36 @@ class CryptoTradingSystem {
     }
     
     filterTokens(tokens) {
+        this.logMessage(`Filtering ${tokens.length} raw tokens`, 'info');
+
         return tokens.filter(token => {
             const liquidity = token.liquidity?.usd || token.liquidityUSD || 0;
             const volume24h = token.volume?.h24 || token.v24hUSD || 0;
             const marketCap = token.marketCap || token.mc || 0;
-            
-            // Apply filters
-            if (liquidity < this.settings.minLiquidity) return false;
-            if (marketCap > 1000000) return false; // Max 1M market cap
-            if (volume24h === 0) return false;
 
-            // Calculate volume/mcap ratio
+            this.logMessage(`Token ${token.symbol}: Liq=${liquidity}, Vol=${volume24h}, MC=${marketCap}`, 'info');
+
+            if (liquidity < this.settings.minLiquidity) {
+                this.logMessage(`${token.symbol} rejected: Low liquidity (${liquidity})`, 'warning');
+                return false;
+            }
+
+            if (marketCap > 10000000) { // limit 10M
+                this.logMessage(`${token.symbol} rejected: High market cap (${marketCap})`, 'warning');
+                return false;
+            }
+
+            if (volume24h === 0) {
+                this.logMessage(`${token.symbol} rejected: No volume`, 'warning');
+                return false;
+            }
+
             const volumeMcapRatio = marketCap > 0 ? volume24h / marketCap : 0;
-            if (volumeMcapRatio < this.settings.volumeMcapRatio) return false;
-            
+            if (volumeMcapRatio < this.settings.volumeMcapRatio) {
+                this.logMessage(`${token.symbol} rejected: Low volume/mcap ratio (${volumeMcapRatio.toFixed(2)})`, 'warning');
+                return false;
+            }
+
             return true;
         }).map(token => ({
             symbol: token.symbol || token.baseToken?.symbol,
@@ -503,7 +563,8 @@ class CryptoTradingSystem {
             volume24h: token.volume?.h24 || token.v24hUSD,
             liquidity: token.liquidity?.usd || token.liquidityUSD,
             marketCap: token.marketCap || token.mc,
-            llmScore: 0
+            llmScore: 0,
+            source: token.source || 'unknown'
         }));
     }
     
@@ -925,6 +986,63 @@ Keep the response concise but informative.`;
         this.showToast('Actualizare date piață...', 'info');
         this.updateDashboard();
     }
+
+    async testDataSources() {
+        this.logMessage('=== TESTARE SURSE DE DATE ===', 'info');
+
+        // Test DexScreener
+        try {
+            const dexUrl = `${this.apiEndpoints.dexscreener}dex/search?q=SOL`;
+            const dexResponse = await fetch(dexUrl);
+            const dexData = await dexResponse.json();
+            this.logMessage(`DexScreener test: ${dexResponse.ok ? 'SUCCESS' : 'FAIL'}`, dexResponse.ok ? 'success' : 'error');
+            if (dexData.pairs) {
+                this.logMessage(`DexScreener pairs: ${dexData.pairs.length}`, 'info');
+            }
+        } catch (error) {
+            this.logMessage(`DexScreener test error: ${error.message}`, 'error');
+        }
+
+        // Test Birdeye
+        if (this.apiKeys.birdeye) {
+            try {
+                const birdeyeUrl = `${this.apiEndpoints.birdeye}tokenlist?sort_by=v24hUSD&sort_type=desc&offset=0&limit=5`;
+                const birdeyeResponse = await fetch(birdeyeUrl, {
+                    headers: { 'X-API-KEY': this.apiKeys.birdeye }
+                });
+                this.logMessage(`Birdeye test: ${birdeyeResponse.ok ? 'SUCCESS' : 'FAIL'}`, birdeyeResponse.ok ? 'success' : 'error');
+                if (birdeyeResponse.ok) {
+                    const birdeyeData = await birdeyeResponse.json();
+                    this.logMessage(`Birdeye response: ${JSON.stringify(birdeyeData).substring(0, 200)}...`, 'info');
+                }
+            } catch (error) {
+                this.logMessage(`Birdeye test error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test Helius
+        if (this.apiKeys.helius) {
+            try {
+                const heliusUrl = `${this.apiEndpoints.helius}?api-key=${this.apiKeys.helius}`;
+                const heliusResponse = await fetch(heliusUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: "2.0",
+                        id: 1,
+                        method: "getSlot"
+                    })
+                });
+                const heliusData = await heliusResponse.json();
+                this.logMessage(`Helius test: ${heliusResponse.ok ? 'SUCCESS' : 'FAIL'}`, heliusResponse.ok ? 'success' : 'error');
+                if (heliusData.result) {
+                    this.logMessage(`Helius slot: ${heliusData.result}`, 'info');
+                }
+            } catch (error) {
+                this.logMessage(`Helius test error: ${error.message}`, 'error');
+            }
+        }
+    }
     
     saveSettings() {
         localStorage.setItem('tradingSettings', JSON.stringify(this.settings));
@@ -1025,6 +1143,10 @@ function saveSettings() {
 
 function loadSettings() {
     tradingSystem.loadSettings();
+}
+
+function testDataSources() {
+    tradingSystem.testDataSources();
 }
 
 function placeBuyOrder() {
