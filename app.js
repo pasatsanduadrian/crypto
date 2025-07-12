@@ -10,7 +10,9 @@ class CryptoTradingSystem {
             coingecko: "https://api.coingecko.com/api/v3/",
             jupiter: "https://lite-api.jup.ag/",
             birdeye: "https://public-api.birdeye.so/defi/",
-            openai: "https://api.openai.com/v1/"
+            openai: "https://api.openai.com/v1/",
+            pumpfun: "https://pump.fun/api/",
+            pumpportal: "wss://pumpportal.fun/api/data"
         };
         
         this.settings = {
@@ -37,6 +39,10 @@ class CryptoTradingSystem {
             totalTrades: 0,
             avgReturn: 0
         };
+
+        this.PUMP_FUN_PROGRAM_ID = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
+        this.pumpPortalWS = null;
+        this.detectedTokens = [];
         
         this.init();
     }
@@ -176,6 +182,9 @@ class CryptoTradingSystem {
                 case 'openai':
                     isConnected = await this.testOpenAIConnection(key);
                     break;
+                case 'pumpfun':
+                    isConnected = await this.testPumpFunConnection();
+                    break;
             }
             
             this.updateApiStatus(apiName, isConnected);
@@ -296,6 +305,29 @@ class CryptoTradingSystem {
             return false;
         }
     }
+
+    async testPumpFunConnection() {
+        return new Promise(resolve => {
+            try {
+                const ws = new WebSocket(this.apiEndpoints.pumpportal);
+                const timeout = setTimeout(() => {
+                    ws.close();
+                    resolve(false);
+                }, 5000);
+                ws.onopen = () => {
+                    clearTimeout(timeout);
+                    ws.close();
+                    resolve(true);
+                };
+                ws.onerror = () => {
+                    clearTimeout(timeout);
+                    resolve(false);
+                };
+            } catch (error) {
+                resolve(false);
+            }
+        });
+    }
     
     updateApiStatus(apiName, isConnected) {
         const statusElement = document.getElementById(`${apiName}Status`);
@@ -328,7 +360,7 @@ class CryptoTradingSystem {
         if (this.scannerActive) return;
         
         // Check if required APIs are connected
-        const requiredApis = ['dexscreener', 'helius'];
+        const requiredApis = ['dexscreener', 'helius', 'pumpfun'];
         const missingApis = requiredApis.filter(api => {
             const status = document.getElementById(`${api}Status`);
             return !status || !status.classList.contains('connected');
@@ -342,6 +374,8 @@ class CryptoTradingSystem {
         this.scannerActive = true;
         document.getElementById('scannerStatus').textContent = 'Activ';
         document.getElementById('scannerStatus').classList.add('active');
+
+        this.initPumpPortalWebSocket();
 
         this.showToast('Scanner pornit', 'success');
         this.logMessage('Scanner pornit', 'success');
@@ -361,6 +395,11 @@ class CryptoTradingSystem {
             clearInterval(this.scannerInterval);
             this.scannerInterval = null;
         }
+
+        if (this.pumpPortalWS) {
+            this.pumpPortalWS.close();
+            this.pumpPortalWS = null;
+        }
         
         document.getElementById('scannerStatus').textContent = 'Oprit';
         document.getElementById('scannerStatus').classList.remove('active');
@@ -372,6 +411,14 @@ class CryptoTradingSystem {
     async scanMarket() {
         try {
             this.logMessage('=== ÎNCEPE SCANAREA PIEȚEI ===', 'info');
+
+            if (!this.pumpPortalWS || this.pumpPortalWS.readyState !== WebSocket.OPEN) {
+                this.initPumpPortalWebSocket();
+            }
+
+            this.logMessage('Scanez Pump.Fun...', 'info');
+            const pumpFunData = await this.scanPumpFun();
+            this.logMessage(`Pump.Fun: ${pumpFunData.length} tokens brute`, 'info');
 
             this.logMessage('Scanez DexScreener...', 'info');
             const dexData = await this.scanDexScreener();
@@ -385,13 +432,15 @@ class CryptoTradingSystem {
             const heliusData = await this.scanHelius();
             this.logMessage(`Helius: ${heliusData.length} tokens brute`, 'info');
 
-            const allTokens = [...dexData, ...birdeyeData, ...heliusData];
+            const allTokens = [...pumpFunData, ...dexData, ...birdeyeData, ...heliusData];
             this.logMessage(`Total tokens brute: ${allTokens.length}`, 'info');
             if (allTokens.length > 0) {
                 this.logMessage(`Sample tokens: ${JSON.stringify(allTokens.slice(0, 3), null, 2)}`, 'info');
             }
 
-            const filteredTokens = this.filterTokens(allTokens);
+            const websocketTokens = this.detectedTokens || [];
+            const combinedTokens = [...allTokens, ...websocketTokens];
+            const filteredTokens = this.filterTokens(combinedTokens);
             this.logMessage(`Tokens după filtre: ${filteredTokens.length}`, 'info');
 
             for (const token of filteredTokens) {
@@ -454,6 +503,92 @@ class CryptoTradingSystem {
             this.logMessage(`Birdeye error: ${error.message}`, 'error');
             return [];
         }
+    }
+
+    async scanPumpFun() {
+        if (!this.apiKeys.helius) return [];
+
+        try {
+            const rpcUrl = `${this.apiEndpoints.helius}?api-key=${this.apiKeys.helius}`;
+
+            const response = await fetch(rpcUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: "2.0",
+                    id: 1,
+                    method: "getSignaturesForAddress",
+                    params: [this.PUMP_FUN_PROGRAM_ID, { limit: 50, commitment: "confirmed" }]
+                })
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error.message);
+
+            const signatures = data.result || [];
+            const tokens = [];
+
+            for (const sig of signatures.slice(0, 10)) {
+                const txData = await this.analyzePumpFunTransaction(sig.signature);
+                if (txData && txData.isNewToken) {
+                    tokens.push(txData);
+                }
+            }
+
+            this.logMessage(`Pump.Fun: ${tokens.length} tokens noi detectați`, 'info');
+            return tokens;
+
+        } catch (error) {
+            this.logMessage(`Pump.Fun scan error: ${error.message}`, 'error');
+            return [];
+        }
+    }
+
+    async analyzePumpFunTransaction(signature) {
+        try {
+            const rpcUrl = `${this.apiEndpoints.helius}?api-key=${this.apiKeys.helius}`;
+
+            const response = await fetch(rpcUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: "2.0",
+                    id: 1,
+                    method: "getTransaction",
+                    params: [signature, { encoding: "json", maxSupportedTransactionVersion: 0 }]
+                })
+            });
+            const data = await response.json();
+            if (data.error || !data.result) return null;
+
+            const tx = data.result;
+            const instructions = tx.transaction.message.instructions || [];
+            for (const ix of instructions) {
+                if (ix.programId === this.PUMP_FUN_PROGRAM_ID) {
+                    const keys = tx.transaction.message.accountKeys;
+                    const tokenMint = keys[ix.accounts[0]];
+                    if (tokenMint && this.isNewToken(tokenMint)) {
+                        return {
+                            address: tokenMint,
+                            signature,
+                            timestamp: tx.blockTime,
+                            isNewToken: true,
+                            source: 'pump.fun'
+                        };
+                    }
+                }
+            }
+            return null;
+        } catch (error) {
+            this.logMessage(`Error analyzing transaction ${signature}: ${error.message}`, 'error');
+            return null;
+        }
+    }
+
+    isNewToken(tokenMint) {
+        if (this.cache.has(tokenMint)) return false;
+        this.cache.set(tokenMint, { data: true, time: Date.now() });
+        return true;
     }
 
     async scanHelius() {
@@ -729,6 +864,48 @@ Consider factors like volume/mcap ratio, price momentum, and liquidity. Respond 
         }
         
         return tokenData;
+    }
+
+    async initPumpPortalWebSocket() {
+        if (this.pumpPortalWS && this.pumpPortalWS.readyState === WebSocket.OPEN) return;
+        try {
+            this.pumpPortalWS = new WebSocket(this.apiEndpoints.pumpportal);
+            this.pumpPortalWS.onopen = () => {
+                this.logMessage('✅ PumpPortal WebSocket connected', 'success');
+                this.pumpPortalWS.send(JSON.stringify({ method: 'subscribeNewToken' }));
+            };
+            this.pumpPortalWS.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                this.processPumpPortalData(data);
+            };
+            this.pumpPortalWS.onclose = () => {
+                this.logMessage('PumpPortal WebSocket closed', 'warning');
+            };
+        } catch (error) {
+            this.logMessage(`PumpPortal WebSocket error: ${error.message}`, 'error');
+        }
+    }
+
+    processPumpPortalData(data) {
+        if (data.method === 'newTokenNotification') {
+            const token = {
+                symbol: data.result.symbol,
+                name: data.result.name,
+                address: data.result.mint,
+                creator: data.result.creator,
+                timestamp: data.result.timestamp,
+                source: 'pump.fun'
+            };
+            this.logMessage(`PumpPortal token: ${token.symbol}`, 'info');
+            this.addDetectedToken(token);
+        }
+    }
+
+    addDetectedToken(token) {
+        if (!this.detectedTokens) this.detectedTokens = [];
+        if (!this.detectedTokens.find(t => t.address === token.address)) {
+            this.detectedTokens.push(token);
+        }
     }
     
     async getDetailedLLMAnalysis(tokenData) {
