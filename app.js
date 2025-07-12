@@ -15,12 +15,15 @@ class CryptoTradingSystem {
         this.settings = {
             volumeSpike: 200,
             minLiquidity: 50000,
+            volumeMcapRatio: 0.5,
             maxExposure: 5,
             dailyLossLimit: 20,
             stopLoss: 15,
             takeProfitLevels: [3, 5, 7],
             checkInterval: 5000
         };
+
+        this.cache = new Map();
         
         this.scannerActive = false;
         this.scannerInterval = null;
@@ -64,7 +67,7 @@ class CryptoTradingSystem {
         });
         
         // Settings inputs
-        ['maxExposure', 'dailyLossLimit', 'stopLoss', 'volumeSpike', 'minLiquidity', 'checkInterval'].forEach(setting => {
+        ['maxExposure', 'dailyLossLimit', 'stopLoss', 'volumeSpike', 'minLiquidity', 'checkInterval', 'volumeMcapRatio'].forEach(setting => {
             const input = document.getElementById(setting);
             if (input) {
                 input.addEventListener('change', () => {
@@ -95,6 +98,47 @@ class CryptoTradingSystem {
             this.updateDashboard();
         }
     }
+
+    logMessage(message, type = 'info') {
+        const list = document.getElementById('alertsList');
+        if (!list) return;
+        const item = document.createElement('div');
+        item.className = `alert-item ${type}`;
+        const time = new Date().toLocaleTimeString();
+        item.textContent = `[${time}] ${message}`;
+        if (list.firstChild && list.firstChild.classList) {
+            list.prepend(item);
+        } else {
+            list.innerHTML = '';
+            list.appendChild(item);
+        }
+        while (list.children.length > 50) list.removeChild(list.lastChild);
+    }
+
+    async fetchJson(url, options = {}, retries = 2, cacheTtl = 60000) {
+        const cached = this.cache.get(url);
+        if (cached && Date.now() - cached.time < cacheTtl) {
+            return cached.data;
+        }
+
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+                const controller = new AbortController();
+                const id = setTimeout(() => controller.abort(), 10000);
+                const response = await fetch(url, { ...options, signal: controller.signal });
+                clearTimeout(id);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.cache.set(url, { data, time: Date.now() });
+                    return data;
+                }
+                this.logMessage(`Request failed ${response.status} for ${url}`, 'error');
+            } catch (err) {
+                this.logMessage(`Request error for ${url}: ${err.message}`, 'error');
+            }
+        }
+        throw new Error('Request failed');
+    }
     
     async testApiConnection(apiName) {
         const key = this.apiKeys[apiName];
@@ -102,8 +146,9 @@ class CryptoTradingSystem {
             this.showToast(`API Key pentru ${apiName} nu este configurat`, 'error');
             return;
         }
-        
+
         this.showLoading(true);
+        this.logMessage(`Test conexiune ${apiName}...`, 'info');
         
         try {
             let isConnected = false;
@@ -137,11 +182,13 @@ class CryptoTradingSystem {
                 `${apiName} ${isConnected ? 'conectat cu succes' : 'conexiune eșuată'}`,
                 isConnected ? 'success' : 'error'
             );
+            this.logMessage(`${apiName} ${isConnected ? 'conectat' : 'nu s-a conectat'}`, isConnected ? 'success' : 'error');
             
         } catch (error) {
             console.error(`Error testing ${apiName}:`, error);
             this.updateApiStatus(apiName, false);
             this.showToast(`Eroare la testarea ${apiName}: ${error.message}`, 'error');
+            this.logMessage(`${apiName} error: ${error.message}`, 'error');
         }
         
         this.showLoading(false);
@@ -149,8 +196,8 @@ class CryptoTradingSystem {
     
     async testHeliusConnection(apiKey) {
         try {
-            const response = await fetch(`${this.apiEndpoints.helius}addresses/So11111111111111111111111111111111111111112/balances?api-key=${apiKey}`);
-            return response.ok;
+            await this.fetchJson(`${this.apiEndpoints.helius}addresses/So11111111111111111111111111111111111111112/balances?api-key=${apiKey}`);
+            return true;
         } catch (error) {
             return false;
         }
@@ -158,12 +205,10 @@ class CryptoTradingSystem {
     
     async testMoralisConnection(apiKey) {
         try {
-            const response = await fetch(`${this.apiEndpoints.moralis}erc20/metadata?chain=eth&addresses=0xdac17f958d2ee523a2206206994597c13d831ec7`, {
-                headers: {
-                    'X-API-Key': apiKey
-                }
+            await this.fetchJson(`${this.apiEndpoints.moralis}erc20/metadata?chain=eth&addresses=0xdac17f958d2ee523a2206206994597c13d831ec7`, {
+                headers: { 'X-API-Key': apiKey }
             });
-            return response.ok;
+            return true;
         } catch (error) {
             return false;
         }
@@ -171,8 +216,8 @@ class CryptoTradingSystem {
     
     async testDexScreenerConnection() {
         try {
-            const response = await fetch(`${this.apiEndpoints.dexscreener}dex/search?q=SOL`);
-            return response.ok;
+            await this.fetchJson(`${this.apiEndpoints.dexscreener}dex/search?q=SOL`);
+            return true;
         } catch (error) {
             return false;
         }
@@ -180,10 +225,10 @@ class CryptoTradingSystem {
     
     async testCoinGeckoConnection(apiKey) {
         try {
-            const response = await fetch(`${this.apiEndpoints.coingecko}ping`, {
+            await this.fetchJson(`${this.apiEndpoints.coingecko}ping`, {
                 headers: apiKey ? { 'x-cg-demo-api-key': apiKey } : {}
             });
-            return response.ok;
+            return true;
         } catch (error) {
             return false;
         }
@@ -191,8 +236,8 @@ class CryptoTradingSystem {
     
     async testJupiterConnection() {
         try {
-            const response = await fetch(`${this.apiEndpoints.jupiter}tokens`);
-            return response.ok;
+            await this.fetchJson(`${this.apiEndpoints.jupiter}tokens`);
+            return true;
         } catch (error) {
             return false;
         }
@@ -200,12 +245,10 @@ class CryptoTradingSystem {
     
     async testBirdeyeConnection(apiKey) {
         try {
-            const response = await fetch(`${this.apiEndpoints.birdeye}tokenlist?sort_by=v24hUSD&sort_type=desc&offset=0&limit=50`, {
-                headers: {
-                    'X-API-KEY': apiKey
-                }
+            await this.fetchJson(`${this.apiEndpoints.birdeye}tokenlist?sort_by=v24hUSD&sort_type=desc&offset=0&limit=50`, {
+                headers: { 'X-API-KEY': apiKey }
             });
-            return response.ok;
+            return true;
         } catch (error) {
             return false;
         }
@@ -213,13 +256,13 @@ class CryptoTradingSystem {
     
     async testOpenAIConnection(apiKey) {
         try {
-            const response = await fetch(`${this.apiEndpoints.openai}models`, {
+            await this.fetchJson(`${this.apiEndpoints.openai}models`, {
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
                     'Content-Type': 'application/json'
                 }
             });
-            return response.ok;
+            return true;
         } catch (error) {
             return false;
         }
@@ -270,8 +313,9 @@ class CryptoTradingSystem {
         this.scannerActive = true;
         document.getElementById('scannerStatus').textContent = 'Activ';
         document.getElementById('scannerStatus').classList.add('active');
-        
+
         this.showToast('Scanner pornit', 'success');
+        this.logMessage('Scanner pornit', 'success');
         
         // Start scanning interval
         this.scannerInterval = setInterval(() => {
@@ -291,12 +335,14 @@ class CryptoTradingSystem {
         
         document.getElementById('scannerStatus').textContent = 'Oprit';
         document.getElementById('scannerStatus').classList.remove('active');
-        
+
         this.showToast('Scanner oprit', 'info');
+        this.logMessage('Scanner oprit', 'warning');
     }
     
     async scanMarket() {
         try {
+            this.logMessage('Scanare piață...', 'info');
             // Scan DexScreener for trending tokens
             const dexData = await this.scanDexScreener();
             
@@ -325,33 +371,30 @@ class CryptoTradingSystem {
     
     async scanDexScreener() {
         try {
-            const response = await fetch(`${this.apiEndpoints.dexscreener}dex/tokens/trending`);
-            if (!response.ok) throw new Error('DexScreener API error');
-            
-            const data = await response.json();
-            return data.schemaVersion ? data.pairs || [] : [];
+            const url = `${this.apiEndpoints.dexscreener}dex/tokens/trending`;
+            const data = await this.fetchJson(url);
+            const pairs = data.schemaVersion ? data.pairs || [] : [];
+            this.logMessage(`DexScreener ${pairs.length} tokeni`, 'info');
+            return pairs;
         } catch (error) {
-            console.error('DexScreener scan error:', error);
+            this.logMessage(`DexScreener error: ${error.message}`, 'error');
             return [];
         }
     }
     
     async scanBirdeye() {
         if (!this.apiKeys.birdeye) return [];
-        
+
         try {
-            const response = await fetch(`${this.apiEndpoints.birdeye}tokenlist?sort_by=v24hUSD&sort_type=desc&offset=0&limit=50`, {
-                headers: {
-                    'X-API-KEY': this.apiKeys.birdeye
-                }
+            const url = `${this.apiEndpoints.birdeye}tokenlist?sort_by=v24hUSD&sort_type=desc&offset=0&limit=50`;
+            const data = await this.fetchJson(url, {
+                headers: { 'X-API-KEY': this.apiKeys.birdeye }
             });
-            
-            if (!response.ok) throw new Error('Birdeye API error');
-            
-            const data = await response.json();
-            return data.data?.tokens || [];
+            const tokens = data.data?.tokens || [];
+            this.logMessage(`Birdeye ${tokens.length} tokeni`, 'info');
+            return tokens;
         } catch (error) {
-            console.error('Birdeye scan error:', error);
+            this.logMessage(`Birdeye error: ${error.message}`, 'error');
             return [];
         }
     }
@@ -366,10 +409,10 @@ class CryptoTradingSystem {
             if (liquidity < this.settings.minLiquidity) return false;
             if (marketCap > 1000000) return false; // Max 1M market cap
             if (volume24h === 0) return false;
-            
+
             // Calculate volume/mcap ratio
             const volumeMcapRatio = marketCap > 0 ? volume24h / marketCap : 0;
-            if (volumeMcapRatio < 0.5) return false;
+            if (volumeMcapRatio < this.settings.volumeMcapRatio) return false;
             
             return true;
         }).map(token => ({
@@ -398,8 +441,7 @@ Liquidity: $${token.liquidity}
 Market Cap: $${token.marketCap}
 
 Consider factors like volume/mcap ratio, price momentum, and liquidity. Respond with only a number 1-100.`;
-            
-            const response = await fetch(`${this.apiEndpoints.openai}chat/completions`, {
+            const data = await this.fetchJson(`${this.apiEndpoints.openai}chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.apiKeys.openai}`,
@@ -411,16 +453,14 @@ Consider factors like volume/mcap ratio, price momentum, and liquidity. Respond 
                     max_tokens: 10,
                     temperature: 0.1
                 })
-            });
-            
-            if (!response.ok) throw new Error('OpenAI API error');
-            
-            const data = await response.json();
+            }, 1, 0);
+
             const score = parseInt(data.choices[0].message.content.trim());
+            this.logMessage(`LLM score ${token.symbol}: ${score}`, 'info');
             return isNaN(score) ? 0 : Math.min(100, Math.max(0, score));
-            
+
         } catch (error) {
-            console.error('LLM analysis error:', error);
+            this.logMessage(`LLM error: ${error.message}`, 'error');
             return 0;
         }
     }
@@ -433,6 +473,7 @@ Consider factors like volume/mcap ratio, price momentum, and liquidity. Respond 
         
         if (tokens.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="text-center">Nu s-au găsit token-uri care îndeplinesc criteriile</td></tr>';
+            this.logMessage('Niciun token detectat', 'warning');
             return;
         }
         
@@ -457,6 +498,7 @@ Consider factors like volume/mcap ratio, price momentum, and liquidity. Respond 
                 </td>
             </tr>
         `).join('');
+        this.logMessage(`Scan complet - ${tokens.length} tokeni`, 'success');
     }
     
     getLLMScoreClass(score) {

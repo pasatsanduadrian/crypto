@@ -839,6 +839,19 @@ select.form-control {
   align-items: center;
 }
 
+.alert-item.info {
+  color: var(--color-info);
+}
+.alert-item.success {
+  color: var(--color-success);
+}
+.alert-item.error {
+  color: var(--color-error);
+}
+.alert-item.warning {
+  color: var(--color-warning);
+}
+
 .position-item:last-child,
 .alert-item:last-child {
   border-bottom: none;
