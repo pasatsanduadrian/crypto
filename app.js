@@ -3,12 +3,13 @@ class CryptoTradingSystem {
     constructor() {
         this.apiKeys = {};
         this.apiEndpoints = {
-            helius: "https://api.helius.xyz/v0/",
+            helius: "https://mainnet.helius-rpc.com/",
+            helRehuisEnhanced: "https://api.helius.xyz/v0/",
             moralis: "https://deep-index.moralis.io/api/v2/",
             dexscreener: "https://api.dexscreener.com/latest/",
             coingecko: "https://api.coingecko.com/api/v3/",
             jupiter: "https://lite-api.jup.ag/",
-            birdeye: "https://public-api.birdeye.so/defi/",
+            birdeye: "https://public-api.birdeye.so/defi/v3/",
             openai: "https://api.openai.com/v1/"
         };
         
@@ -196,9 +197,37 @@ class CryptoTradingSystem {
     
     async testHeliusConnection(apiKey) {
         try {
-            await this.fetchJson(`${this.apiEndpoints.helius}addresses/So11111111111111111111111111111111111111112/balances?api-key=${apiKey}`);
+            const url = `${this.apiEndpoints.helius}?api-key=${apiKey}`;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    jsonrpc: "2.0",
+                    id: 1,
+                    method: "getSlot"
+                })
+            });
+
+            if (!response.ok) {
+                console.error(`Helius error: ${response.status}`);
+                return false;
+            }
+
+            const data = await response.json();
+
+            if (data.error) {
+                console.error(`Helius API error: ${data.error.message}`);
+                return false;
+            }
+
+            console.log('✅ Helius connected! Current slot:', data.result);
             return true;
+
         } catch (error) {
+            console.error('Helius connection failed:', error);
             return false;
         }
     }
@@ -299,7 +328,7 @@ class CryptoTradingSystem {
         if (this.scannerActive) return;
         
         // Check if required APIs are connected
-        const requiredApis = ['dexscreener', 'birdeye'];
+        const requiredApis = ['dexscreener', 'helius'];
         const missingApis = requiredApis.filter(api => {
             const status = document.getElementById(`${api}Status`);
             return !status || !status.classList.contains('connected');
@@ -345,12 +374,15 @@ class CryptoTradingSystem {
             this.logMessage('Scanare piață...', 'info');
             // Scan DexScreener for trending tokens
             const dexData = await this.scanDexScreener();
-            
+
             // Scan Birdeye for new tokens
             const birdeyeData = await this.scanBirdeye();
-            
+
+            // Scan Helius for Solana tokens
+            const heliusData = await this.scanHelius();
+
             // Combine and analyze data
-            const allTokens = [...dexData, ...birdeyeData];
+            const allTokens = [...dexData, ...birdeyeData, ...heliusData];
             const filteredTokens = this.filterTokens(allTokens);
             
             // Analyze with LLM if available
@@ -395,6 +427,53 @@ class CryptoTradingSystem {
             return tokens;
         } catch (error) {
             this.logMessage(`Birdeye error: ${error.message}`, 'error');
+            return [];
+        }
+    }
+
+    async scanHelius() {
+        if (!this.apiKeys.helius) return [];
+
+        try {
+            const url = `${this.apiEndpoints.helius}?api-key=${this.apiKeys.helius}`;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: "2.0",
+                    id: 1,
+                    method: "getTokenAccountsByOwner",
+                    params: [
+                        "86xCnPeV69n6t3DnyGvkKobf9FdN2H9oiVDdaMpo2MMY",
+                        { "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+                        { "encoding": "jsonParsed" }
+                    ]
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Helius scan error: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(`Helius API error: ${data.error.message}`);
+            }
+
+            const tokenAccounts = data.result?.value || [];
+            this.logMessage(`Helius: ${tokenAccounts.length} token accounts`, 'info');
+
+            return tokenAccounts.map(account => ({
+                address: account.account.data.parsed.info.mint,
+                balance: account.account.data.parsed.info.tokenAmount.uiAmount,
+                symbol: 'UNKNOWN',
+                source: 'helius'
+            }));
+
+        } catch (error) {
+            this.logMessage(`Helius scan error: ${error.message}`, 'error');
             return [];
         }
     }
