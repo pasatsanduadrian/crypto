@@ -149,7 +149,8 @@ class CryptoTradingSystem {
     
     async testApiConnection(apiName) {
         const key = this.apiKeys[apiName];
-        if (!key && apiName !== 'dexscreener') {
+        const noKeyRequired = ['dexscreener', 'pumpfun'];
+        if (!key && !noKeyRequired.includes(apiName)) {
             this.showToast(`API Key pentru ${apiName} nu este configurat`, 'error');
             return;
         }
