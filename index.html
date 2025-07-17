@@ -3,256 +3,236 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Screening & Trading System</title>
+    <title>Crypto Trading System - Solana</title>
     <link rel="stylesheet" href="style.css">
+    
+    <!-- External Dependencies -->
+    <script src="https://unpkg.com/@solana/web3.js@1.95.2/lib/index.iife.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bs58@5.0.0/index.min.js"></script>
 </head>
 <body>
     <div class="app-container">
-        <!-- Header -->
         <header class="header">
             <div class="header-content">
                 <div class="logo">
-                    <h1>Crypto Screening & Trading System</h1>
+                    <h1>Crypto Trading System</h1>
                 </div>
+                
                 <nav class="nav-tabs">
                     <button class="nav-tab active" data-tab="dashboard">Dashboard</button>
+                    <button class="nav-tab" data-tab="config">Configurare</button>
                     <button class="nav-tab" data-tab="scanner">Scanner</button>
                     <button class="nav-tab" data-tab="trading">Trading</button>
                     <button class="nav-tab" data-tab="analytics">Analytics</button>
-                    <button class="nav-tab" data-tab="settings">Setări</button>
                 </nav>
+                
                 <div class="header-info">
-                    <button class="btn btn--primary" id="connectWallet">Connect Wallet</button>
-                    <div id="walletInfo" class="wallet-info hidden">
-                        <span class="wallet-address"></span>
-                        <span class="wallet-balance">0 SOL</span>
-                    </div>
                     <div class="connection-status">
-                        <span class="status-indicator" id="connectionStatus">Deconectat</span>
+                        <div class="status-indicator">Deconectat</div>
+                    </div>
+                    <div id="walletInfo" class="wallet-info">
+                        <button id="connectWallet" class="btn btn--primary">Connect Wallet</button>
+                        <div class="wallet-balance">0.0000 SOL</div>
                     </div>
                 </div>
             </div>
         </header>
 
-        <!-- Main Content -->
         <main class="main-content">
-            <!-- Settings Tab -->
-            <div class="tab-content" id="settings">
-                <div class="container">
-                    <h2>Configurare API</h2>
-                    <div class="api-config-grid">
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>Helius API (Solana)</h3>
-                                <span class="api-status" id="heliusStatus">Deconectat</span>
-                            </div>
-                            <div class="card__body">
-                                <div class="form-group">
-                                    <label class="form-label">API Key</label>
-                                    <input type="password" class="form-control" id="heliusKey" placeholder="Introduceți Helius API Key">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Market Overview</h3>
+                            <div class="market-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">Active Coins</span>
+                                    <span class="stat-value" id="activeCoins">0</span>
                                 </div>
-                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('helius')">Test Conexiune</button>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>Moralis API</h3>
-                                <span class="api-status" id="moralisStatus">Deconectat</span>
-                            </div>
-                            <div class="card__body">
-                                <div class="form-group">
-                                    <label class="form-label">API Key</label>
-                                    <input type="password" class="form-control" id="moralisKey" placeholder="Introduceți Moralis API Key">
+                                <div class="stat-item">
+                                    <span class="stat-label">Volume 24h</span>
+                                    <span class="stat-value" id="volume24h">$0</span>
                                 </div>
-                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('moralis')">Test Conexiune</button>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>DexScreener API</h3>
-                                <span class="api-status" id="dexscreenerStatus">Deconectat</span>
-                            </div>
-                            <div class="card__body">
-                                <div class="form-group">
-                                    <label class="form-label">API Key (Opțional)</label>
-                                    <input type="password" class="form-control" id="dexscreenerKey" placeholder="API Key (pentru rate limits mari)">
+                                <div class="stat-item">
+                                    <span class="stat-label">Signals</span>
+                                    <span class="stat-value" id="activeSignals">0</span>
                                 </div>
-                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('dexscreener')">Test Conexiune</button>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>CoinGecko API</h3>
-                                <span class="api-status" id="coingeckoStatus">Deconectat</span>
-                            </div>
-                            <div class="card__body">
-                                <div class="form-group">
-                                    <label class="form-label">API Key</label>
-                                    <input type="password" class="form-control" id="coingeckoKey" placeholder="Introduceți CoinGecko API Key">
-                                </div>
-                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('coingecko')">Test Conexiune</button>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>Jupiter API</h3>
-                                <span class="api-status" id="jupiterStatus">Deconectat</span>
-                            </div>
-                            <div class="card__body">
-                                <div class="form-group">
-                                    <label class="form-label">API Key</label>
-                                    <input type="password" class="form-control" id="jupiterKey" placeholder="Introduceți Jupiter API Key">
-                                </div>
-                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('jupiter')">Test Conexiune</button>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>Birdeye API</h3>
-                                <span class="api-status" id="birdeyeStatus">Deconectat</span>
-                            </div>
-                            <div class="card__body">
-                                <div class="form-group">
-                                    <label class="form-label">API Key</label>
-                                    <input type="password" class="form-control" id="birdeyeKey" placeholder="Introduceți Birdeye API Key">
-                                </div>
-                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('birdeye')">Test Conexiune</button>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>OpenAI API (LLM)</h3>
-                                <span class="api-status" id="openaiStatus">Deconectat</span>
-                            </div>
-                            <div class="card__body">
-                                <div class="form-group">
-                                    <label class="form-label">API Key</label>
-                                    <input type="password" class="form-control" id="openaiKey" placeholder="Introduceți OpenAI API Key">
-                                </div>
-                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('openai')">Test Conexiune LLM</button>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>PumpPortal WS</h3>
-                                <span class="api-status" id="pumpportalStatus">Deconectat</span>
-                            </div>
-                            <div class="card__body">
-                                <div class="form-group">
-                                    <label class="form-label">API Key (opțional)</label>
-                                    <input type="password" class="form-control" id="pumpportalKey" placeholder="PumpPortal API Key">
-                                </div>
-                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('pumpportal')">Test Conexiune</button>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="mt-8">
-                        <h2>Setări Trading</h2>
-                        <div class="settings-grid">
-                            <div class="card">
-                                <div class="card__body">
-                                    <h4>Risk Management</h4>
-                                    <div class="form-group">
-                                        <label class="form-label">Max Exposure per Coin (%)</label>
-                                        <input type="number" class="form-control" id="maxExposure" value="5" min="1" max="10">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Daily Loss Limit (%)</label>
-                                        <input type="number" class="form-control" id="dailyLossLimit" value="20" min="5" max="50">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Stop Loss (%)</label>
-                                        <input type="number" class="form-control" id="stopLoss" value="15" min="5" max="30">
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="card">
-                                <div class="card__body">
-                                    <h4>Signal Detection</h4>
-                                    <div class="form-group">
-                                        <label class="form-label">Volume Spike (%)</label>
-                                        <input type="number" class="form-control" id="volumeSpike" value="200" min="100" max="500">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Min Liquidity ($)</label>
-                                        <input type="number" class="form-control" id="minLiquidity" value="50000" min="10000" max="500000">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Min Volume/MC Ratio</label>
-                                        <input type="number" step="0.1" class="form-control" id="volumeMcapRatio" value="0.5" min="0" max="2">
-                                    </div>
-                                    <div class="form-group">
-                                        <label class="form-label">Check Interval (ms)</label>
-                                        <input type="number" class="form-control" id="checkInterval" value="5000" min="1000" max="60000">
-                                    </div>
-                                </div>
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Active Positions</h3>
+                            <div id="positionsList" class="positions-list">
+                                <p class="text-center text-secondary">Nu există poziții active</p>
                             </div>
                         </div>
-                        
-                        <div class="flex gap-8 mt-8">
-                            <button class="btn btn--primary" onclick="tradingSystem.saveSettings()">Salvează Setări</button>
-                            <button class="btn btn--secondary" onclick="tradingSystem.loadSettings()">Încarcă Setări</button>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Recent Alerts</h3>
+                            <div id="alertsList" class="alerts-list">
+                                <p class="text-center text-secondary">Nu există alerte recente</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="safetyResults" class="card">
+                        <div class="card__body">
+                            <h3>Safety Analysis</h3>
+                            <div id="safetyContent">
+                                <p class="text-center text-secondary">Nu sunt rezultate de siguranță disponibile</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Dashboard Tab -->
-            <div class="tab-content active" id="dashboard">
-                <div class="container">
-                    <div class="dashboard-grid">
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>Market Overview</h3>
-                                <button class="btn btn--sm btn--outline" onclick="tradingSystem.refreshMarketData()">Refresh</button>
-                            </div>
-                            <div class="card__body">
-                                <div class="market-stats">
-                                    <div class="stat-item">
-                                        <span class="stat-label">Active Coins</span>
-                                        <span class="stat-value" id="activeCoins">0</span>
-                                    </div>
-                                    <div class="stat-item">
-                                        <span class="stat-label">Volume 24h</span>
-                                        <span class="stat-value" id="totalVolume">$0</span>
-                                    </div>
-                                    <div class="stat-item">
-                                        <span class="stat-label">Signals</span>
-                                        <span class="stat-value" id="activeSignals">0</span>
-                                    </div>
-                                </div>
+            <!-- Configuration Tab -->
+            <div id="config" class="tab-content">
+                <h2>Configurare API</h2>
+                
+                <div class="api-config-grid">
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Helius API (Solana)</h3>
+                            <div class="api-status" id="heliusStatus">Deconectat</div>
+                            <div class="form-group">
+                                <input type="password" id="heliusKey" class="form-control" placeholder="API Key">
+                                <button onclick="tradingSystem.testApiConnection('helius')" class="btn btn--secondary mt-8">Test Connection</button>
                             </div>
                         </div>
-
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>Active Positions</h3>
-                            </div>
-                            <div class="card__body">
-                                <div class="positions-list" id="positionsList">
-                                    <p class="text-secondary">Nu există poziții active</p>
-                                </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Moralis API</h3>
+                            <div class="api-status" id="moralisStatus">Deconectat</div>
+                            <div class="form-group">
+                                <input type="password" id="moralisKey" class="form-control" placeholder="API Key">
+                                <button onclick="tradingSystem.testApiConnection('moralis')" class="btn btn--secondary mt-8">Test Connection</button>
                             </div>
                         </div>
-
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>Recent Alerts</h3>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>DexScreener API</h3>
+                            <div class="api-status" id="dexscreenerStatus">Deconectat</div>
+                            <div class="form-group">
+                                <input type="password" id="dexscreenerKey" class="form-control" placeholder="API Key (Optional)">
+                                <button onclick="tradingSystem.testApiConnection('dexscreener')" class="btn btn--secondary mt-8">Test Connection</button>
                             </div>
-                            <div class="card__body">
-                                <div class="alerts-list" id="alertsList">
-                                    <p class="text-secondary">Nu există alerte recente</p>
-                                </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>CoinGecko API</h3>
+                            <div class="api-status" id="coingeckoStatus">Deconectat</div>
+                            <div class="form-group">
+                                <input type="password" id="coingeckoKey" class="form-control" placeholder="API Key">
+                                <button onclick="tradingSystem.testApiConnection('coingecko')" class="btn btn--secondary mt-8">Test Connection</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Jupiter API</h3>
+                            <div class="api-status" id="jupiterStatus">Deconectat</div>
+                            <div class="form-group">
+                                <input type="password" id="jupiterKey" class="form-control" placeholder="API Key (Optional)">
+                                <button onclick="tradingSystem.testApiConnection('jupiter')" class="btn btn--secondary mt-8">Test Connection</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Birdeye API</h3>
+                            <div class="api-status" id="birdeyeStatus">Deconectat</div>
+                            <div class="form-group">
+                                <input type="password" id="birdeyeKey" class="form-control" placeholder="API Key">
+                                <button onclick="tradingSystem.testApiConnection('birdeye')" class="btn btn--secondary mt-8">Test Connection</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>OpenAI API (LLM)</h3>
+                            <div class="api-status" id="openaiStatus">Deconectat</div>
+                            <div class="form-group">
+                                <input type="password" id="openaiKey" class="form-control" placeholder="API Key">
+                                <button onclick="tradingSystem.testApiConnection('openai')" class="btn btn--secondary mt-8">Test Connection</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>PumpPortal WS</h3>
+                            <div class="api-status" id="pumpportalStatus">Deconectat</div>
+                            <div class="form-group">
+                                <input type="password" id="pumpportalKey" class="form-control" placeholder="API Key (Optional)">
+                                <p class="text-secondary">Nu necesită API Key</p>
+                                <button onclick="tradingSystem.testApiConnection('pumpportal')" class="btn btn--secondary mt-8">Test Connection</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h2>Setări Trading</h2>
+                <div class="settings-grid">
+                    <div class="card">
+                        <div class="card__body">
+                            <h4>Risk Management</h4>
+                            <div class="form-group">
+                                <label for="volumeSpike" class="form-label">Volume Spike Threshold (%)</label>
+                                <input type="number" id="volumeSpike" class="form-control" value="200" min="100" max="1000">
+                            </div>
+                            <div class="form-group">
+                                <label for="minLiquidity" class="form-label">Minimum Liquidity ($)</label>
+                                <input type="number" id="minLiquidity" class="form-control" value="50000" min="1000" max="1000000">
+                            </div>
+                            <div class="form-group">
+                                <label for="volumeMcapRatio" class="form-label">Volume/MC Ratio</label>
+                                <input type="number" id="volumeMcapRatio" class="form-control" value="0.5" min="0.1" max="10" step="0.1">
+                            </div>
+                            <div class="form-group">
+                                <label for="maxExposure" class="form-label">Max Exposure per Trade (%)</label>
+                                <input type="number" id="maxExposure" class="form-control" value="5" min="1" max="25">
+                            </div>
+                            <div class="form-group">
+                                <label for="dailyLossLimit" class="form-label">Daily Loss Limit (%)</label>
+                                <input type="number" id="dailyLossLimit" class="form-control" value="20" min="5" max="50">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card__body">
+                            <h4>Signal Detection</h4>
+                            <div class="form-group">
+                                <label for="checkInterval" class="form-label">Check Interval (ms)</label>
+                                <input type="number" id="checkInterval" class="form-control" value="5000" min="1000" max="60000">
+                            </div>
+                            <div class="form-group">
+                                <label for="slippage" class="form-label">Slippage (%)</label>
+                                <input type="number" id="slippage" class="form-control" value="0.5" min="0.1" max="5" step="0.1">
+                            </div>
+                            <div class="form-group">
+                                <label for="priorityFee" class="form-label">Priority Fee (SOL)</label>
+                                <input type="number" id="priorityFee" class="form-control" value="0.0001" min="0.00001" max="0.01" step="0.00001">
+                            </div>
+                            <div class="form-group">
+                                <label for="maxPositions" class="form-label">Max Positions</label>
+                                <input type="number" id="maxPositions" class="form-control" value="10" min="1" max="50">
                             </div>
                         </div>
                     </div>
@@ -260,104 +240,93 @@
             </div>
 
             <!-- Scanner Tab -->
-            <div class="tab-content" id="scanner">
-                <div class="container">
-                    <div class="scanner-controls">
-                        <h2>Live Market Scanner</h2>
-                        <div class="flex gap-8 mb-8">
-                            <button class="btn btn--primary" onclick="tradingSystem.startScanning()">Start Scanner</button>
-                            <button class="btn btn--secondary" onclick="tradingSystem.stopScanning()">Stop Scanner</button>
-                            <button class="btn btn--outline" onclick="tradingSystem.testDataSources()">Test Data Sources</button>
-                            <span class="scanner-status" id="scannerStatus">Oprit</span>
-                        </div>
-                    </div>
-                    
-                    <div class="scanner-results">
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>Coins Detectate</h3>
-                                <span class="badge" id="detectedCount">0</span>
-                            </div>
-                            <div class="card__body">
-                                <div class="table-container">
-                                    <table class="coins-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Symbol</th>
-                                                <th>Price</th>
-                                                <th>24h Change</th>
-                                                <th>Volume</th>
-                                                <th>Liquidity</th>
-                                                <th>Market Cap</th>
-                                                <th>LLM Score</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="coinsTableBody">
-                                            <tr>
-                                                <td colspan="8" class="text-center">Pornește scanner-ul pentru a vedea rezultatele</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+            <div id="scanner" class="tab-content">
+                <h2>Live Market Scanner</h2>
+                
+                <div class="scanner-controls">
+                    <button id="toggleScanner" class="btn btn--primary">Pornește Scanner</button>
+                    <span id="scannerStatus" class="scanner-status">Oprit</span>
+                </div>
+                
+                <div class="card">
+                    <div class="card__body">
+                        <h3>Coins Detectate <span id="detectedCount" class="badge">0</span></h3>
+                        <div class="table-container">
+                            <table class="coins-table">
+                                <thead>
+                                    <tr>
+                                        <th>Symbol</th>
+                                        <th>Price</th>
+                                        <th>24h Change</th>
+                                        <th>Volume</th>
+                                        <th>Liquidity</th>
+                                        <th>Market Cap</th>
+                                        <th>LLM Score</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="coinsTableBody">
+                                    <tr>
+                                        <td colspan="8" class="text-center">Pornește scanner-ul pentru a vedea rezultatele</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Trading Tab -->
-            <div class="tab-content" id="trading">
-                <div class="container">
-                    <h2>Trading Interface</h2>
-                    <div class="trading-grid">
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>Order Entry</h3>
+            <div id="trading" class="tab-content">
+                <h2>Trading Interface</h2>
+                
+                <div class="trading-grid">
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Order Entry</h3>
+                            <div class="form-group">
+                                <label for="tokenAddress" class="form-label">Token Address</label>
+                                <input type="text" id="tokenAddress" class="form-control" placeholder="Token mint address">
                             </div>
-                            <div class="card__body">
+                            <div class="form-group">
+                                <label for="tradeAmount" class="form-label">Amount (SOL)</label>
+                                <input type="number" id="tradeAmount" class="form-control" placeholder="0.1" step="0.01" min="0.001">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Order Type</label>
                                 <div class="form-group">
-                                    <label class="form-label">Token Address</label>
-                                    <input type="text" class="form-control" id="tokenAddress" placeholder="Introduceți adresa token-ului">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Amount ($)</label>
-                                    <input type="number" class="form-control" id="tradeAmount" value="100" min="10" max="10000">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Order Type</label>
-                                    <div class="order-type-options">
-                                        <label><input type="radio" name="orderType" value="market" checked> Market</label>
-                                        <label><input type="radio" name="orderType" value="limit"> Limit</label>
-                                    </div>
-                                </div>
-                                <div class="form-group hidden" id="limitPriceGroup">
-                                    <label class="form-label">Limit Price</label>
-                                    <input type="number" class="form-control" id="limitPrice" placeholder="Limit Price">
+                                    <input type="radio" id="marketOrder" name="orderType" value="market" checked>
+                                    <label for="marketOrder">Market Order</label>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">Stop Loss (%)</label>
-                                    <input type="number" class="form-control" id="stopLossPercent" value="15">
+                                    <input type="radio" id="limitOrder" name="orderType" value="limit">
+                                    <label for="limitOrder">Limit Order</label>
                                 </div>
-                                <div class="form-group">
-                                    <label class="form-label">Take Profit (%)</label>
-                                    <input type="number" class="form-control" id="takeProfitPercent" value="25">
-                                </div>
-                                <div class="flex gap-8">
-                                    <button class="btn btn--primary" onclick="tradingSystem.executeRealTrade('buy')">Buy</button>
-                                    <button class="btn btn--secondary" onclick="tradingSystem.executeRealTrade('sell')">Sell</button>
-                                </div>
+                            </div>
+                            <div id="limitPriceGroup" class="form-group hidden">
+                                <label for="limitPrice" class="form-label">Preț Limit</label>
+                                <input type="number" id="limitPrice" class="form-control" placeholder="0.00" step="0.0001">
+                            </div>
+                            <div class="form-group">
+                                <label for="stopLossPercent" class="form-label">Stop Loss (%)</label>
+                                <input type="number" id="stopLossPercent" class="form-control" placeholder="15" min="1" max="100" value="15">
+                            </div>
+                            <div class="form-group">
+                                <label for="takeProfitPercent" class="form-label">Take Profit (%)</label>
+                                <input type="number" id="takeProfitPercent" class="form-control" placeholder="25" min="1" max="500" value="25">
+                            </div>
+                            <div class="form-group">
+                                <button onclick="tradingSystem.executeRealTrade('buy')" class="btn btn--primary btn--full-width">Buy</button>
+                                <button onclick="tradingSystem.executeRealTrade('sell')" class="btn btn--secondary btn--full-width mt-8">Sell</button>
                             </div>
                         </div>
-
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>Position Management</h3>
-                            </div>
-                            <div class="card__body">
-                                <div class="positions-grid" id="positionsGrid">
-                                    <p class="text-secondary">Nu există poziții active</p>
-                                </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Position Management</h3>
+                            <div id="positionsGrid" class="positions-grid">
+                                <p class="text-center text-secondary">Nu există poziții active</p>
                             </div>
                         </div>
                     </div>
@@ -365,44 +334,39 @@
             </div>
 
             <!-- Analytics Tab -->
-            <div class="tab-content" id="analytics">
-                <div class="container">
-                    <h2>Analytics & Performance</h2>
-                    <div class="analytics-grid">
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>Performance Metrics</h3>
-                            </div>
-                            <div class="card__body">
-                                <div class="metrics-grid">
-                                    <div class="metric-item">
-                                        <span class="metric-label">Total P&L</span>
-                                        <span class="metric-value" id="totalPnl">$0.00</span>
-                                    </div>
-                                    <div class="metric-item">
-                                        <span class="metric-label">Win Rate</span>
-                                        <span class="metric-value" id="winRate">0%</span>
-                                    </div>
-                                    <div class="metric-item">
-                                        <span class="metric-label">Total Trades</span>
-                                        <span class="metric-value" id="totalTrades">0</span>
-                                    </div>
-                                    <div class="metric-item">
-                                        <span class="metric-label">Average Return</span>
-                                        <span class="metric-value" id="avgReturn">0%</span>
-                                    </div>
+            <div id="analytics" class="tab-content">
+                <h2>Analytics & Performance</h2>
+                
+                <div class="analytics-grid">
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Performance Metrics</h3>
+                            <div class="metrics-grid">
+                                <div class="metric-item">
+                                    <span class="metric-label">Total P&L</span>
+                                    <span class="metric-value" id="totalPnl">$0.00</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Win Rate</span>
+                                    <span class="metric-value" id="winRate">0%</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Total Trades</span>
+                                    <span class="metric-value" id="totalTrades">0</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Average Return</span>
+                                    <span class="metric-value" id="avgReturn">0%</span>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="card">
-                            <div class="card__header">
-                                <h3>P&L Chart</h3>
-                            </div>
-                            <div class="card__body">
-                                <div class="chart-container">
-                                    <canvas id="pnlChart" height="300"></canvas>
-                                </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Performance Chart</h3>
+                            <div class="chart-container">
+                                <canvas id="performanceChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -412,14 +376,39 @@
     </div>
 
     <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loadingOverlay">
+    <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-spinner"></div>
-        <p>Loading...</p>
+        <p>Se procesează...</p>
     </div>
 
-    <!-- Toast Notifications -->
-    <div class="toast-container" id="toastContainer"></div>
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
 
-    <script src="app.js"></script>
+    <!-- Main JavaScript -->
+    <script src="crypto-trading-complete.js"></script>
+    
+    <script>
+        // Initialize system when DOM is loaded
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('Initializing Crypto Trading System...');
+            
+            // Wait for Solana Web3 to be available
+            let attempts = 0;
+            while (!window.solanaWeb3 && attempts < 50) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            
+            if (!window.solanaWeb3) {
+                console.error('Solana Web3 not loaded');
+                return;
+            }
+            
+            // Initialize the trading system
+            window.tradingSystem = new CryptoTradingSystem();
+            
+            console.log('✅ Crypto Trading System initialized successfully');
+        });
+    </script>
 </body>
 </html>
