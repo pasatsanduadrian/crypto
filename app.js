@@ -11,8 +11,8 @@ class CryptoTradingSystem {
             jupiter: "https://lite-api.jup.ag/",
             birdeye: "https://public-api.birdeye.so/defi/",
             openai: "https://api.openai.com/v1/",
-            pumpfun: "https://pump.fun/api/",
-            pumpportal: "wss://pumpportal.fun/api/data"
+            pumpportal: "https://pump.fun/api/",
+            pumpportalWS: "wss://pumpportal.fun/api/data"
         };
         
         this.settings = {
@@ -149,7 +149,7 @@ class CryptoTradingSystem {
     
     async testApiConnection(apiName) {
         const key = this.apiKeys[apiName];
-        const noKeyRequired = ['dexscreener', 'pumpfun'];
+        const noKeyRequired = ['dexscreener'];
         if (!key && !noKeyRequired.includes(apiName)) {
             this.showToast(`API Key pentru ${apiName} nu este configurat`, 'error');
             return;
@@ -183,8 +183,8 @@ class CryptoTradingSystem {
                 case 'openai':
                     isConnected = await this.testOpenAIConnection(key);
                     break;
-                case 'pumpfun':
-                    isConnected = await this.testPumpFunConnection();
+                case 'pumpportal':
+                    isConnected = await this.testPumpPortalConnection(key);
                     break;
             }
             
@@ -307,10 +307,10 @@ class CryptoTradingSystem {
         }
     }
 
-    async testPumpFunConnection() {
+    async testPumpPortalConnection() {
         return new Promise(resolve => {
             try {
-                const ws = new WebSocket(this.apiEndpoints.pumpportal);
+                const ws = new WebSocket(this.apiEndpoints.pumpportalWS);
                 const timeout = setTimeout(() => {
                     ws.close();
                     resolve(false);
@@ -361,7 +361,7 @@ class CryptoTradingSystem {
         if (this.scannerActive) return;
         
         // Check if required APIs are connected
-        const requiredApis = ['dexscreener', 'helius', 'pumpfun'];
+        const requiredApis = ['helius'];
         const missingApis = requiredApis.filter(api => {
             const status = document.getElementById(`${api}Status`);
             return !status || !status.classList.contains('connected');
@@ -824,6 +824,28 @@ Consider factors like volume/mcap ratio, price momentum, and liquidity. Respond 
             this.showToast(`Ordine executată pentru ${symbol}`, 'success');
         }, 2000);
     }
+
+    async executeRealTrade(side) {
+        const tokenAddress = document.getElementById('tokenAddress').value;
+        const amount = parseFloat(document.getElementById('tradeAmount').value);
+        if (!tokenAddress || !amount) {
+            this.showToast('Introduceți date valide', 'error');
+            return;
+        }
+        // Placeholder: call quickBuy for demo purposes
+        this.quickBuy(tokenAddress, 'CUSTOM');
+    }
+
+    async connectWallet() {
+        // Demo wallet connect
+        const connectBtn = document.getElementById('connectWallet');
+        const walletInfo = document.getElementById('walletInfo');
+        connectBtn.classList.add('hidden');
+        walletInfo.classList.remove('hidden');
+        walletInfo.querySelector('.wallet-address').textContent = 'DEMO';
+        walletInfo.querySelector('.wallet-balance').textContent = '0 SOL';
+        this.showToast('Wallet connected (demo)', 'success');
+    }
     
     async analyzeToken(tokenAddress) {
         this.showLoading(true);
@@ -870,7 +892,7 @@ Consider factors like volume/mcap ratio, price momentum, and liquidity. Respond 
     async initPumpPortalWebSocket() {
         if (this.pumpPortalWS && this.pumpPortalWS.readyState === WebSocket.OPEN) return;
         try {
-            this.pumpPortalWS = new WebSocket(this.apiEndpoints.pumpportal);
+            this.pumpPortalWS = new WebSocket(this.apiEndpoints.pumpportalWS);
             this.pumpPortalWS.onopen = () => {
                 this.logMessage('✅ PumpPortal WebSocket connected', 'success');
                 this.pumpPortalWS.send(JSON.stringify({ method: 'subscribeNewToken' }));

@@ -23,11 +23,13 @@
                     <button class="nav-tab" data-tab="settings">Setări</button>
                 </nav>
                 <div class="header-info">
+                    <button class="btn btn--primary" id="connectWallet">Connect Wallet</button>
+                    <div id="walletInfo" class="wallet-info hidden">
+                        <span class="wallet-address"></span>
+                        <span class="wallet-balance">0 SOL</span>
+                    </div>
                     <div class="connection-status">
                         <span class="status-indicator" id="connectionStatus">Deconectat</span>
-                    </div>
-                    <div class="balance">
-                        <span id="accountBalance">$0.00</span>
                     </div>
                 </div>
             </div>
@@ -50,7 +52,7 @@
                                     <label class="form-label">API Key</label>
                                     <input type="password" class="form-control" id="heliusKey" placeholder="Introduceți Helius API Key">
                                 </div>
-                                <button class="btn btn--primary" onclick="testApiConnection('helius')">Test Conexiune</button>
+                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('helius')">Test Conexiune</button>
                             </div>
                         </div>
 
@@ -64,7 +66,7 @@
                                     <label class="form-label">API Key</label>
                                     <input type="password" class="form-control" id="moralisKey" placeholder="Introduceți Moralis API Key">
                                 </div>
-                                <button class="btn btn--primary" onclick="testApiConnection('moralis')">Test Conexiune</button>
+                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('moralis')">Test Conexiune</button>
                             </div>
                         </div>
 
@@ -78,7 +80,7 @@
                                     <label class="form-label">API Key (Opțional)</label>
                                     <input type="password" class="form-control" id="dexscreenerKey" placeholder="API Key (pentru rate limits mari)">
                                 </div>
-                                <button class="btn btn--primary" onclick="testApiConnection('dexscreener')">Test Conexiune</button>
+                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('dexscreener')">Test Conexiune</button>
                             </div>
                         </div>
 
@@ -92,7 +94,7 @@
                                     <label class="form-label">API Key</label>
                                     <input type="password" class="form-control" id="coingeckoKey" placeholder="Introduceți CoinGecko API Key">
                                 </div>
-                                <button class="btn btn--primary" onclick="testApiConnection('coingecko')">Test Conexiune</button>
+                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('coingecko')">Test Conexiune</button>
                             </div>
                         </div>
 
@@ -106,7 +108,7 @@
                                     <label class="form-label">API Key</label>
                                     <input type="password" class="form-control" id="jupiterKey" placeholder="Introduceți Jupiter API Key">
                                 </div>
-                                <button class="btn btn--primary" onclick="testApiConnection('jupiter')">Test Conexiune</button>
+                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('jupiter')">Test Conexiune</button>
                             </div>
                         </div>
 
@@ -120,7 +122,7 @@
                                     <label class="form-label">API Key</label>
                                     <input type="password" class="form-control" id="birdeyeKey" placeholder="Introduceți Birdeye API Key">
                                 </div>
-                                <button class="btn btn--primary" onclick="testApiConnection('birdeye')">Test Conexiune</button>
+                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('birdeye')">Test Conexiune</button>
                             </div>
                         </div>
 
@@ -134,18 +136,21 @@
                                     <label class="form-label">API Key</label>
                                     <input type="password" class="form-control" id="openaiKey" placeholder="Introduceți OpenAI API Key">
                                 </div>
-                                <button class="btn btn--primary" onclick="testApiConnection('openai')">Test Conexiune LLM</button>
+                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('openai')">Test Conexiune LLM</button>
                             </div>
                         </div>
 
                         <div class="card">
                             <div class="card__header">
                                 <h3>PumpPortal WS</h3>
-                                <span class="api-status" id="pumpfunStatus">Deconectat</span>
+                                <span class="api-status" id="pumpportalStatus">Deconectat</span>
                             </div>
                             <div class="card__body">
-                                <p class="text-secondary">Nu necesită API Key</p>
-                                <button class="btn btn--primary" onclick="testApiConnection('pumpfun')">Test Conexiune</button>
+                                <div class="form-group">
+                                    <label class="form-label">API Key (opțional)</label>
+                                    <input type="password" class="form-control" id="pumpportalKey" placeholder="PumpPortal API Key">
+                                </div>
+                                <button class="btn btn--primary" onclick="tradingSystem.testApiConnection('pumpportal')">Test Conexiune</button>
                             </div>
                         </div>
                     </div>
@@ -195,8 +200,8 @@
                         </div>
                         
                         <div class="flex gap-8 mt-8">
-                            <button class="btn btn--primary" onclick="saveSettings()">Salvează Setări</button>
-                            <button class="btn btn--secondary" onclick="loadSettings()">Încarcă Setări</button>
+                            <button class="btn btn--primary" onclick="tradingSystem.saveSettings()">Salvează Setări</button>
+                            <button class="btn btn--secondary" onclick="tradingSystem.loadSettings()">Încarcă Setări</button>
                         </div>
                     </div>
                 </div>
@@ -209,7 +214,7 @@
                         <div class="card">
                             <div class="card__header">
                                 <h3>Market Overview</h3>
-                                <button class="btn btn--sm btn--outline" onclick="refreshMarketData()">Refresh</button>
+                                <button class="btn btn--sm btn--outline" onclick="tradingSystem.refreshMarketData()">Refresh</button>
                             </div>
                             <div class="card__body">
                                 <div class="market-stats">
@@ -260,9 +265,9 @@
                     <div class="scanner-controls">
                         <h2>Live Market Scanner</h2>
                         <div class="flex gap-8 mb-8">
-                            <button class="btn btn--primary" onclick="startScanning()">Start Scanner</button>
-                            <button class="btn btn--secondary" onclick="stopScanning()">Stop Scanner</button>
-                            <button class="btn btn--outline" onclick="testDataSources()">Test Data Sources</button>
+                            <button class="btn btn--primary" onclick="tradingSystem.startScanning()">Start Scanner</button>
+                            <button class="btn btn--secondary" onclick="tradingSystem.stopScanning()">Stop Scanner</button>
+                            <button class="btn btn--outline" onclick="tradingSystem.testDataSources()">Test Data Sources</button>
                             <span class="scanner-status" id="scannerStatus">Oprit</span>
                         </div>
                     </div>
@@ -321,14 +326,26 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Order Type</label>
-                                    <select class="form-control" id="orderType">
-                                        <option value="market">Market Order</option>
-                                        <option value="limit">Limit Order</option>
-                                    </select>
+                                    <div class="order-type-options">
+                                        <label><input type="radio" name="orderType" value="market" checked> Market</label>
+                                        <label><input type="radio" name="orderType" value="limit"> Limit</label>
+                                    </div>
+                                </div>
+                                <div class="form-group hidden" id="limitPriceGroup">
+                                    <label class="form-label">Limit Price</label>
+                                    <input type="number" class="form-control" id="limitPrice" placeholder="Limit Price">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Stop Loss (%)</label>
+                                    <input type="number" class="form-control" id="stopLossPercent" value="15">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Take Profit (%)</label>
+                                    <input type="number" class="form-control" id="takeProfitPercent" value="25">
                                 </div>
                                 <div class="flex gap-8">
-                                    <button class="btn btn--primary" onclick="placeBuyOrder()">Buy</button>
-                                    <button class="btn btn--secondary" onclick="placeSellOrder()">Sell</button>
+                                    <button class="btn btn--primary" onclick="tradingSystem.executeRealTrade('buy')">Buy</button>
+                                    <button class="btn btn--secondary" onclick="tradingSystem.executeRealTrade('sell')">Sell</button>
                                 </div>
                             </div>
                         </div>
